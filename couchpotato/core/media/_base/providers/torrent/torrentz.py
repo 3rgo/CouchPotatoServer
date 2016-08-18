@@ -16,8 +16,8 @@ class Base(TorrentMagnetProvider, RSS):
 
     urls = {
          'detail': 'https://torrentz2.eu/%s',
-         'search': 'https://torrentz2.eu/feed?q=%s',
-         'verified_search': 'https://torrentz2.eu/feed_verified?q=%s'
+         'search': 'https://torrentz2.eu/search?q=%s',
+         'verified_search': 'https://torrentz2.eu/verified?q=%s'
     }
 
     http_time_between_calls = 0
