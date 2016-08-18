@@ -6,6 +6,7 @@ import urllib
 import urllib2
 import re
 import time
+import traceback
 from datetime import datetime
 from bs4 import BeautifulSoup
 from couchpotato.core.helpers.variable import getTitle, tryInt

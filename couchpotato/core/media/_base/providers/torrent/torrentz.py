@@ -72,12 +72,12 @@ class Base(TorrentMagnetProvider, RSS):
 
 
 config = [{
-    'name': 'torrentz2',
+    'name': 'torrentz',
     'groups': [
         {
             'tab': 'searcher',
             'list': 'torrent_providers',
-            'name': 'torrentz2',
+            'name': 'torrentz',
             'description': 'torrentz2 is a free, fast and powerful meta-search engine. <a href="https://torrentz2.eu/" target="_blank">torrentz2</a>',
             'wizard': True,
             'icon': 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAQklEQVQ4y2NgAALjtJn/ycEMlGiGG0IVAxiwAKzOxaKGARcgxgC8YNSAwWoAzuRMjgsIugqfAUR5CZcBRIcHsWEAADSA96Ig020yAAAAAElFTkSuQmCC',
