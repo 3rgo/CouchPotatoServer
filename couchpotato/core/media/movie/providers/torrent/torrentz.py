@@ -5,7 +5,7 @@ from couchpotato.core.media.movie.providers.base import MovieProvider
 
 log = CPLog(__name__)
 
-autoload = 'Torrentz2'
+autoload = 'Torrentz'
 
 
 class Torrentz(MovieProvider, Base):
