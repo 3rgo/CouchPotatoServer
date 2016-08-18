@@ -27,9 +27,9 @@ class TheMovieDb(MovieProvider):
           'YTNkYzExMWU2NjEwNWY2Mzg3ZTk5MzkzODEzYWU0ZDU=', 'ZjZiZDY4N2ZmYTYzY2QyODJiNmZmMmM2ODc3ZjI2Njk=']
 
     def __init__(self):
-        addEvent('info.search', self.search, priority = 3)
-        addEvent('movie.search', self.search, priority = 3)
-        addEvent('movie.info', self.getInfo, priority = 3)
+        addEvent('info.search', self.search, priority = 1)
+        addEvent('movie.search', self.search, priority = 1)
+        addEvent('movie.info', self.getInfo, priority = 1)
         addEvent('movie.info_by_tmdb', self.getInfo)
         addEvent('app.load', self.config)
 
