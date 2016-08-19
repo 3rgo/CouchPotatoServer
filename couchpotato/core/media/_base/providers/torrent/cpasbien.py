@@ -43,16 +43,14 @@ class Base(TorrentProvider):
             return
 
 
-        TitleStringReal = (getTitle(movie['info']) + ' ' + simplifyString(quality['identifier'] )).replace('-',' ').replace(' ',' ').replace(' ',' ').replace(' ',' ').encode("utf8")
+        TitleStringReal = (getTitle(movie['info']) + ' ' + simplifyString(quality['identifier'] )).replace('-',' ').replace(' ',' ').replace(' ',' ').replace(' ',' ').replace(' ','-').encode("utf8")
 
         URL = (self.urls['search']).encode('UTF8')
         URL=unicodedata.normalize('NFD',unicode(URL,"utf8","replace"))
         URL=URL.encode('ascii','ignore')
         URL = urllib2.quote(URL.encode('utf8'), ":/?=")
-
-        values = {
-          'champ_recherche' : TitleStringReal
-        }
+        URL = URL + TitleStringReal+".html"
+        values = { }
 
         data_tmp = urllib.urlencode(values)
         req = urllib2.Request(URL, data_tmp, headers={'User-Agent' : "Mozilla/5.0"} )
