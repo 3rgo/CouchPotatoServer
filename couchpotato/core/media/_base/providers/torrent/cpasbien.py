@@ -44,25 +44,25 @@ class Base(TorrentProvider):
 
 
         TitleStringReal = (getTitle(movie['info']) + ' ' + simplifyString(quality['identifier'] )).replace('-',' ').replace(' ',' ').replace(' ',' ').replace(' ',' ').encode("utf8")
-        
+
         URL = (self.urls['search']).encode('UTF8')
         URL=unicodedata.normalize('NFD',unicode(URL,"utf8","replace"))
         URL=URL.encode('ascii','ignore')
         URL = urllib2.quote(URL.encode('utf8'), ":/?=")
-        
+
         values = {
           'champ_recherche' : TitleStringReal
         }
 
         data_tmp = urllib.urlencode(values)
         req = urllib2.Request(URL, data_tmp, headers={'User-Agent' : "Mozilla/5.0"} )
-        
+
         data = urllib2.urlopen(req )
-       
+
         id = 1000
 
         if data:
-                       
+
             try:
                 html = BeautifulSoup(data)
                 lin=0
@@ -80,14 +80,29 @@ class Base(TorrentProvider):
                             erlin=1
                     except:
                         erlin=1
+                nbrResult = 0
                 for result in resultdiv:
 
                     try:
-                        
+
                         new = {}
                         name = result.findAll(attrs = {'class' : ["titre"]})[0].text
-                        testname=namer_check.correctName(name,movie)
-                        if testname==0:
+                        testname = namer_check.correctName(name,movie)
+                        if testname == 0 and nbrResult < 5:
+                            values_sec = {}
+                            url_sec = result.find("a")['href'];
+                            data_tmp_sec = urllib.urlencode(values_sec)
+                            req_sec = urllib2.Request(url_sec, data_tmp_sec, headers={'User-Agent': "Mozilla/5.0"})
+                            data_sec = urllib2.urlopen(req_sec)
+                            if data_sec:
+                                html_sec = BeautifulSoup(data_sec)
+                                classlin_sec = 'textefiche'
+                                resultlin_sec = html_sec.findAll(attrs={'id': [classlin_sec]})[0]
+                                name = resultlin_sec.find("strong").text
+                                name = name.replace(".", " ")
+                                testname = namer_check.correctName(name, movie)
+                        nbrResult += 1
+                        if testname == 0:
                             continue
                         detail_url = result.find("a")['href']
                         tmp = detail_url.split('/')[-1].replace('.html','.torrent')
@@ -98,9 +113,9 @@ class Base(TorrentProvider):
                         age = '1'
 
                         verify = getTitle(movie['info']).split(' ')
-                        
+
                         add = 1
-                        
+
                         for verify_unit in verify:
                             if (name.lower().find(verify_unit.lower()) == -1) :
                                 add = 0
@@ -111,26 +126,26 @@ class Base(TorrentProvider):
                         if add == 1:
 
                             new['id'] = id
-                            new['name'] = name.strip()
+                            new['name'] = name.strip() + ' french'
                             new['url'] = url_download
                             new['detail_url'] = detail_url
-                           
                             new['size'] = self.parseSize(size)
-                            new['age'] = self.ageToDays(age)
+                            new['age'] = 1
                             new['seeders'] = tryInt(seeder)
                             new['leechers'] = tryInt(leecher)
                             new['extra_check'] = extra_check
-                            new['download'] = self.loginDownload             
-    
+                            new['download'] = self.loginDownload
+
                             #new['score'] = fireEvent('score.calculate', new, movie, single = True)
-    
+
                             #log.error('score')
                             #log.error(new['score'])
-    
+
                             results.append(new)
-    
+
                             id = id+1
-                        
+
+
                     except:
                         log.error('Failed parsing cPASbien: %s', traceback.format_exc())
 
@@ -186,33 +201,33 @@ class Base(TorrentProvider):
         else:
             log.error('Login to cPASbien failed: returned code %d' % response.getcode())
             return False
-        
-        
+
+
     def loginDownload(self, url = '', nzb_id = ''):
         values = {
           'url' : '/'
         }
         data_tmp = urllib.urlencode(values)
         req = urllib2.Request(url, data_tmp, headers={'User-Agent' : "Mozilla/5.0"} )
-        
+
         try:
             if not self.last_login_check and not self.login():
                 log.error('Failed downloading from %s', self.getName())
             return urllib2.urlopen(req).read()
         except:
             log.error('Failed downloading from %s: %s', (self.getName(), traceback.format_exc()))
-            
+
     def download(self, url = '', nzb_id = ''):
-        
+
         if not self.last_login_check and not self.login():
             return
-        
+
         values = {
           'url' : '/'
         }
         data_tmp = urllib.urlencode(values)
         req = urllib2.Request(url, data_tmp, headers={'User-Agent' : "Mozilla/5.0"} )
-        
+
         try:
             return urllib2.urlopen(req).read()
         except:
