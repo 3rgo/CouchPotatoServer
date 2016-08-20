@@ -3,6 +3,8 @@ CouchPotato
 
 [![Join the chat at https://gitter.im/CouchPotato/CouchPotatoServer](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/CouchPotato/CouchPotatoServer?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
+**This is a french version with T411 and Cpasbien.** 
+
 CouchPotato (CP) is an automatic NZB and torrent downloader. You can keep a "movies I want"-list and it will search for NZBs/torrents of these movies every X hours.
 Once a movie is found, it will send it to SABnzbd or download the torrent to a specified directory.
 
