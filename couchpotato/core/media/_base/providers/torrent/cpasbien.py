@@ -128,7 +128,7 @@ class Base(TorrentProvider):
                             new['url'] = url_download
                             new['detail_url'] = detail_url
                             new['size'] = self.parseSize(size)
-                            new['age'] = 1
+                            new['age'] = 10
                             new['seeders'] = tryInt(seeder)
                             new['leechers'] = tryInt(leecher)
                             new['extra_check'] = extra_check
