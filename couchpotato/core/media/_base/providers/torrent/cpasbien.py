@@ -8,21 +8,25 @@ import re
 import traceback
 import urllib
 import urllib2
+import ssl
 import unicodedata
 from couchpotato.core.helpers import namer_check
-
+from StringIO import StringIO
+import gzip
 log = CPLog(__name__)
 
 
 class Base(TorrentProvider):
 
     urls = {
-        'test': 'http://www.cpasbien.io/',
-        'search': 'http://www.cpasbien.io/recherche/',
+        'test': 'https://www.nextorrent.net',
+        'search': 'https://www.nextorrent.net/torrents/recherche/',
     }
 
     http_time_between_calls = 1 #seconds
     cat_backup_id = None
+    cj = cookielib.CookieJar()
+    opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
 
     class NotLoggedInHTTPError(urllib2.HTTPError):
         def __init__(self, url, code, msg, headers, fp):
@@ -43,19 +47,24 @@ class Base(TorrentProvider):
             return
 
 
-        TitleStringReal = (getTitle(movie['info']) + ' ' + simplifyString(quality['identifier'] )).replace('-',' ').replace(' ',' ').replace(' ',' ').replace(' ',' ').replace(' ','-').encode("utf8")
+        TitleStringReal = (getTitle(movie['info']) + ' ' + simplifyString(quality['identifier'] )).replace('-',' ').replace(' ',' ').replace(' ',' ').replace(' ',' ').encode("utf8")
 
         URL = (self.urls['search']).encode('UTF8')
         URL=unicodedata.normalize('NFD',unicode(URL,"utf8","replace"))
         URL=URL.encode('ascii','ignore')
+
+
         URL = urllib2.quote(URL.encode('utf8'), ":/?=")
-        URL = URL + TitleStringReal+".html"
+        URL = URL + TitleStringReal
         values = { }
+        URLTST = (self.urls['test']).encode('UTF8')
 
         data_tmp = urllib.urlencode(values)
+
+
         req = urllib2.Request(URL, data_tmp, headers={'User-Agent' : "Mozilla/5.0"} )
 
-        data = urllib2.urlopen(req )
+        data = urllib2.urlopen(req)
 
         id = 1000
 
@@ -63,51 +72,57 @@ class Base(TorrentProvider):
 
             try:
                 html = BeautifulSoup(data)
-                lin=0
                 erlin=0
                 resultdiv=[]
                 while erlin==0:
                     try:
-                        classlin='ligne'+str(lin)
-                        resultlin=html.findAll(attrs = {'class' : [classlin]})
-                        if resultlin:
-                            for ele in resultlin:
-                                resultdiv.append(ele)
-                            lin+=1
-                        else:
-                            erlin=1
+                        resultContent = html.findAll(attrs={'class': ["listing-torrent"]})[0]
+                        if resultContent:
+                            resultlin = resultContent.findAll(attrs={'class': ['table-hover']})[0].find('tbody')
+                            if resultlin:
+                                    trList= resultlin.findAll("tr");
+                                    for tr in trList:
+                                        resultdiv.append(tr)
+                        erlin=1
                     except:
                         erlin=1
                 nbrResult = 0
                 for result in resultdiv:
 
                     try:
-
                         new = {}
-                        name = result.findAll(attrs = {'class' : ["titre"]})[0].text
+                        firstTd = result.findAll("td")[0]
+                        nothing = firstTd.findAll("center")
+                        if nothing:
+                            continue
+                        name = firstTd.findAll("a")[1]['title'];
                         testname = namer_check.correctName(name,movie)
                         if testname == 0 and nbrResult < 5:
                             values_sec = {}
-                            url_sec = result.find("a")['href'];
-                            data_tmp_sec = urllib.urlencode(values_sec)
-                            req_sec = urllib2.Request(url_sec, data_tmp_sec, headers={'User-Agent': "Mozilla/5.0"})
+                            url_sec = result.findAll("a")[1]['href'];
+                            req_sec = urllib2.Request(URLTST+url_sec, values_sec, headers={'User-Agent': "Mozilla/5.0"})
                             data_sec = urllib2.urlopen(req_sec)
                             if data_sec:
                                 html_sec = BeautifulSoup(data_sec)
-                                classlin_sec = 'textefiche'
+                                classlin_sec = 'torrentsdesc'
                                 resultlin_sec = html_sec.findAll(attrs={'id': [classlin_sec]})[0]
-                                name = resultlin_sec.find("strong").text
+                                name = resultlin_sec.find("div").text
                                 name = name.replace(".", " ")
                                 testname = namer_check.correctName(name, movie)
-                        nbrResult += 1
                         if testname == 0:
                             continue
-                        detail_url = result.find("a")['href']
-                        tmp = detail_url.split('/')[-1].replace('.html','.torrent')
-                        url_download = ('http://www.cpasbien.io/telechargement/%s' % tmp)
-                        size = result.findAll(attrs = {'class' : ["poid"]})[0].text
-                        seeder = result.findAll(attrs = {'class' : ["seed_ok"]})[0].text
-                        leecher = result.findAll(attrs = {'class' : ["down"]})[0].text
+                        nbrResult += 1
+                        values_sec = {}
+                        detail_url = result.findAll("a")[1]['href'];
+                        req_sec = urllib2.Request(URLTST+detail_url, values_sec, headers={'User-Agent': "Mozilla/5.0"})
+                        data_sec = urllib2.urlopen(req_sec)
+                        html_sec = BeautifulSoup(data_sec)
+                        classlin_sec = 'download'
+                        resultlin_sec = html_sec.findAll(attrs={'class': [classlin_sec]})[0]
+                        url_download = resultlin_sec.findAll("a")[0]['href']
+                        size = result.findAll("td")[1].text
+                        seeder = result.findAll("td")[2].text
+                        leecher = result.findAll("td")[3].text
                         age = '1'
 
                         verify = getTitle(movie['info']).split(' ')
@@ -145,7 +160,7 @@ class Base(TorrentProvider):
 
 
                     except:
-                        log.error('Failed parsing cPASbien: %s', traceback.format_exc())
+                        log.error('Failed parsing zetorrents: %s', traceback.format_exc())
 
             except AttributeError:
                 log.debug('No search results found.')
@@ -173,45 +188,33 @@ class Base(TorrentProvider):
         return tryInt(age)
 
     def login(self):
+        return True
 
-        cookieprocessor = urllib2.HTTPCookieProcessor(cookielib.CookieJar())
-        opener = urllib2.build_opener(cookieprocessor, Base.PTPHTTPRedirectHandler())
-        opener.addheaders = [
-            ('User-Agent', 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.1 (KHTML, like Gecko)'),
-            ('Accept', 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'),
-            ('Accept-Language', 'fr-fr,fr;q=0.5'),
-            ('Accept-Charset', 'ISO-8859-1,utf-8;q=0.7,*;q=0.7'),
-            ('Keep-Alive', '115'),
-            ('Connection', 'keep-alive'),
-            ('Cache-Control', 'max-age=0'),
-        ]
-
-        try:
-            response = opener.open('http://www.cpasbien.io', tryUrlencode({'url': '/'}))
-        except urllib2.URLError as e:
-            log.error('Login to cPASbien failed: %s' % e)
-            return False
-
-        if response.getcode() == 200:
-            log.debug('Login HTTP cPASbien status 200; seems successful')
-            self.last_login_check = opener
-            return True
-        else:
-            log.error('Login to cPASbien failed: returned code %d' % response.getcode())
-            return False
 
 
     def loginDownload(self, url = '', nzb_id = ''):
-        values = {
-          'url' : '/'
-        }
-        data_tmp = urllib.urlencode(values)
-        req = urllib2.Request(url, data_tmp, headers={'User-Agent' : "Mozilla/5.0"} )
-
         try:
-            if not self.last_login_check and not self.login():
-                log.error('Failed downloading from %s', self.getName())
-            return urllib2.urlopen(req).read()
+            URLTST = (self.urls['test']).encode('UTF8')
+            request_headers = {
+                'User-Agent': 'Mozilla/5.0',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'fr,fr-FR;q=0.8,en-US;q=0.5,en;q=0.3',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Referer': 'https://www.nextorrent.net/torrent/3183/beaut-cache',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1'
+            }
+            request = urllib2.Request(URLTST+url, headers=request_headers)
+            response = self.opener.open(request)
+            if response.info().get('Content-Encoding') == 'gzip':
+                buf = StringIO(response.read())
+                f = gzip.GzipFile(fileobj=buf)
+                data = f.read()
+                f.close()
+            else:
+                data = response.read()
+            response.close()
+            return data
         except:
             log.error('Failed downloading from %s: %s', (self.getName(), traceback.format_exc()))
 
@@ -231,14 +234,14 @@ class Base(TorrentProvider):
         except:
             log.error('Failed downloading from %s: %s', (self.getName(), traceback.format_exc()))
 config = [{
-    'name': 'cpasbien',
+    'name': 'zetorrents',
     'groups': [
         {
             'tab': 'searcher',
             'list': 'torrent_providers',
-            'name': 'cpasbien',
-            'description': 'See <a href="http://www.cpasbien.io/">cPASbien</a>',
-            'icon': 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAgZJREFUOI2lkj9oE2EYxn93l/Quf440gXg4lBoEMd2MDuLSkk0R6hCnuqjUoR0c7FDo4Ca0CDo7uRRBqEMDXSLUUqRDiZM1NMEI1VKTlDZpUppccvc5nJp/KooPfMPH+z3P+zzv+8F/Quq8XIVEEOY0kASIzpoLlBKUV+CuCblfCjyF/P3V1Qi6jrCs7k4eD/X1dS5NTy9tQaJD2MFDkA23W8UwQFGQRJcB0DS0cBg/DPY4a0OVZcHeHihKf1ifD6pVfGD/VmBAUeDwEGQZLAskCVQV6nVYW+M4lSLQo9stoKpQLoNtO2QhYHsbkkmOczm+AP5eBy/BfwRDn8GHJLkpFp3utRpkMpDLwckJvlCIM9Uqg6YZeAAj58E1CVlXCaaigcCjsWhU8Xq9UCo5lisVx4FhODFkGbdpMtlqXa4IsVUHYkLcVlbg3ddGo3AzErl2emLCGaCmwcAAuL4ntCxoNpFsG8O2odlkXojF17CgAK2PsJna2Xk/ViyOh0dHXWhaewaW1T6mSb5a5V6rtbAMU4D5c18FyCzu7i5fyWZvDMfjOh4PNBpd5A/5vLheq93ZhMc/eF0Lr0NhaX8/eS6djo/EYqfQdUekUuHNxsZR4uDg1id40f9J+qE/CwTeitlZIWZmxKtQqOSFi39D7IQy5/c/fxIMpoGhfyUDMAwXzsL4n958A9jfxsJ8X4WQAAAAAElFTkSuQmCC',
+            'name': 'nextorrent',
+            'description': 'See <a href="https://www.nextorrent.com/">nextorrent</a>',
+            'icon': 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAIGNIUk0AAHolAACAgwAA+f8AAIDpAAB1MAAA6mAAADqYAAAXb5JfxUYAAAI5SURBVHjabJM/T+NAEMV/u57YsQ05pBS00EQiJFKIoOGTUFFDQY0QfAFo4FNQI0FDg+iogPTuafJHCiaOUbzra7DPubuVRlqtZt68eW9W+b7/sbGxsaK1BsBaS5ZlKKXKyPO8vBd5P7lforX+1ev1gna7XQIMBgPe398REUQEpRRpmrK1tcXu7i6e55FlGa+vr444jmP29vY4ODjAGEOtViOKIm5ubnh5eSEIAkSE7+9vWq0Wh4eHrK6ukiQJs9nM6CrtxWLBfD6n1WpxcnJCv99nNpthjEEpVeYVYa3lz0A/J89zkiSh0+lwenpKv98njmOMMfzv6DzPl4q11ogIcRzT6XQ4Ozuj2+0ynU5LkGqNLlQuipMkIY5jgiBgMpnQ7XY5Pz+n3W7z+fmJMWbJCV21yPM8hsMht7e3RFFEs9lkNBrR6/W4uLhgZ2cHYwzW2hJAqpQcx8FxHJ6enhgMBlxdXbG+vs54PGZ/f5/t7W2UUkt6aAClVDmbiNBoNHh+fuby8pLhcMja2hrz+Rzf96nVav9q8LcLIkIYhjw+PnJ9fc1oNCIMQ7IsK/UqGkv1ocrG8zwcx+H+/p56vc7x8TGNRoM0TZcZK6UQETzPK0NrjbWWMAwBuLu7Q2vN0dERzWaTxWJR6iXWWt7e3siyDBFhMpkwHo9xXZc8z6nX66RpysPDQ7mlhRNRFKF8359tbm4Ghbd5ni8tTEG36Oq6bvU3Jsp13Q+l1EpVmOqiFCCFVksOaP31ewAjgDxHOfDVqAAAAABJRU5ErkJggg==',
             'wizard': True,
             'options': [
                 {

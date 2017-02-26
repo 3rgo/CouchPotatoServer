@@ -4,8 +4,8 @@ from couchpotato.core.media.movie.providers.base import MovieProvider
 
 log = CPLog(__name__)
 
-autoload = 'cpasbien'
+autoload = 'zetorrents'
 
 
-class cpasbien(MovieProvider, Base):
+class zetorrents(MovieProvider, Base):
     pass
