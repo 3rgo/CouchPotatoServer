@@ -18,9 +18,9 @@ log = CPLog(__name__)
 class Base(TorrentProvider):
 
     urls = {
-        'test': 'http://www.t411.li/',
-        'detail': 'http://www.t411.li/torrents/?id=%s',
-        'search': 'http://www.t411.li/torrents/search/?',
+        'test': 'http://www.t411.am/',
+        'detail': 'http://www.t411.am/torrents/?id=%s',
+        'search': 'http://www.t411.am/torrents/search/?',
     }
 
     http_time_between_calls = 1 #seconds
@@ -120,8 +120,8 @@ class Base(TorrentProvider):
                                 testname=namer_check.correctName(name,movie)
                                 if testname==0:
                                     continue
-                                url = ('http://www.t411.li/torrents/download/?id=%s' % idt)
-                                detail_url = ('http://www.t411.li/torrents/?id=%s' % idt)
+                                url = ('http://www.t411.am/torrents/download/?id=%s' % idt)
+                                detail_url = ('http://www.t411.am/torrents/?id=%s' % idt)
                                 leecher = result.findAll('td')[8].text
                                 size = result.findAll('td')[5].text
                                 age = result.findAll('td')[4].text
@@ -185,7 +185,7 @@ class Base(TorrentProvider):
         ]
 
         try:
-            response = self.opener.open('http://www.t411.li/users/login/', self.getLoginParams())
+            response = self.opener.open('http://www.t411.am/users/login/', self.getLoginParams())
         except urllib2.URLError as e:
             log.error('Login to T411 failed: %s' % e)
             return False
@@ -234,7 +234,7 @@ config = [{
             'tab': 'searcher',
             'list': 'torrent_providers',
             'name': 't411',
-            'description': 'See <a href="https://www.t411.li/">T411</a>',
+            'description': 'See <a href="https://www.t411.am/">T411</a>',
             'icon' : 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAIGNIUk0AAHolAACAgwAA+f8AAIDpAAB1MAAA6mAAADqYAAAXb5JfxUYAAAILSURBVHja5NNdS1MBAMbxfztnbtNlZRnq1DYOZiUWEZkLKgoyA5WibGAWEhgFQhfhboKgmy4kBIteLhODVhYxCEFDMssLdZrD95cc0+lSp9tp6nC6nS4E/QDeBD0f4AfPA4+oKApbicgW848AZz57qZR2MK2OlcbkSPFUW+Mtl8OhXVGpPPFJhl/x6dLo90l/n3+PcYIDR2YZ7J9gvA/lhWUdCItaXc1AoKbFNVK+5vfB80cgd6DLLkiLiBpzeGKSzHOnCP/8wtKHAJrUTNfKbqkCaBABuobnqi8lr5VLTjvDkzLIM6TmFNHRbudV/Q9sNjuvnz3kbnEZubmHCSzMmmxN3U+gZB0wDjVfqbt2EUuDzPC8jG7/IQpKrvPy7Vd0Wg3enm5q3zWyGruL31Et6aYMqG9L2NggPNZJXUsS9jcfIfsCeaU3KLMUYf/mQNqXRtDVS3TpD1q9nmnvFOaskyDqNkd0j7g/tQ54bp8+m0urN0TvwhrvbXaMGSZEQWBbTCIJcRq263UEg0uEQyFiDCbfBpBkfXo/MNu+cybEZZL3qsfnlqmuuoOQks3RnOMoKWnUNnURVlREI2q51un3iMdOPNgAtNLBxYqbWRZnfqGhqrnnnm9++Sqlj+MiiuBxrOKmpHDUGwwNIgj9oqAa8i8uBwl5Nyu48lUA5JkTpyrN562A9T/6wt8BAMiyz2KTkBbfAAAAAElFTkSuQmCC', 'wizard': True,
             'options': [
                 {
