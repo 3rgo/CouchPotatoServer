@@ -33,7 +33,7 @@ class Base(TorrentProvider):
 
                 req = urllib2.Request(URL, headers={'User-Agent' : "Mozilla/5.0"} )
                 log.info('opening url %s', URL)
-                data = urllib2.urlopen(req,timeout=10)
+                data = urllib2.urlopen(req,timeout=500)
 
                 id = 1000
 
