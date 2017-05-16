@@ -4,228 +4,262 @@ from couchpotato.core.logger import CPLog
 from couchpotato.core.helpers.encoding import simplifyString, tryUrlencode
 from couchpotato.core.media._base.providers.torrent.base import TorrentProvider
 from couchpotato.core.helpers import namer_check
-import cookielib
+import json
 import re
+import unicodedata
 import traceback
 import urllib2
+import sys
 import urllib
-from StringIO import StringIO
-import gzip
-import time
+
 log = CPLog(__name__)
 
+import ast
+import operator
+
+_binOps = {
+    ast.Add: operator.add,
+    ast.Sub: operator.sub,
+    ast.Mult: operator.mul,
+    ast.Div: operator.div,
+    ast.Mod: operator.mod
+}
+
+def _arithmeticEval(s):
+    """
+    A safe eval supporting basic arithmetic operations.
+    :param s: expression to evaluate
+    :return: value
+    """
+    node = ast.parse(s, mode='eval')
+
+    def _eval(node):
+        if isinstance(node, ast.Expression):
+            return _eval(node.body)
+        elif isinstance(node, ast.Str):
+            return node.s
+        elif isinstance(node, ast.Num):
+            return node.n
+        elif isinstance(node, ast.BinOp):
+            return _binOps[type(node.op)](_eval(node.left), _eval(node.right))
+        else:
+            raise Exception('Unsupported type {}'.format(node))
+
+    return _eval(node.body)
 
 class Base(TorrentProvider):
 
+
     urls = {
-        'test': 'http://www.t411.al',
-        'detail': 'http://www.t411.al/torrents/?id=%s',
-        'search': 'http://www.t411.al/torrents/search/?',
+        'test' : 'https://www.t411.al',
+        'login' : 'https://www.t411.al/users/login/',
+        'login_check': 'https://www.t411.al',
+        'detail': 'https://www.t411.al/torrents/?id=%s',
+        'search': 'https://www.t411.al/torrents/search/?search=%s %s',
+        'download' : 'http://www.t411.al/torrents/download/?id=%s',
     }
 
     http_time_between_calls = 1 #seconds
     cat_backup_id = None
-    cj = cookielib.CookieJar()
-    opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
 
-    class NotLoggedInHTTPError(urllib2.HTTPError):
-        def __init__(self, url, code, msg, headers, fp):
-            urllib2.HTTPError.__init__(self, url, code, msg, headers, fp)
+    def _searchOnTitle(self, title, movie, quality, results):
 
-    class PTPHTTPRedirectHandler(urllib2.HTTPRedirectHandler):
-        def http_error_302(self, req, fp, code, msg, headers):
-            log.debug("302 detected; redirected to %s" % headers['Location'])
-            if (headers['Location'] != 'login.php'):
-                return urllib2.HTTPRedirectHandler.http_error_302(self, req, fp, code, msg, headers)
-            else:
-                raise Base.NotLoggedInHTTPError(req.get_full_url(), code, msg, headers, fp)
-
-    def getSearchParams(self, movie, quality):
-        results = []
-        MovieTitles = movie['info']['titles']
-        moviequality = simplifyString(quality['identifier'])
-        moviegenre = movie['info']['genres']
-        if 'Animation' in moviegenre:
-            subcat=455
-        elif 'Documentaire' in moviegenre or 'Documentary' in moviegenre:
-            subcat=634
+        # test the new title and search for it if valid
+        newTitle = self.getFrenchTitle(title, str(movie['info']['year']))
+        request = ''
+        if isinstance(title, str):
+            title = title.decode('utf8')
+        if newTitle is not None:
+            request = (u'(' + title + u')|(' + newTitle + u')').replace(':', '')
         else:
-            subcat=631
-        if moviequality in ['720p']:
-            qualpar="&term%5B17%5D%5B%5D=541&term%5B17%5D%5B%5D=542&term%5B17%5D%5B%5D=719&term%5B17%5D%5B%5D=1160&term%5B17%5D%5B%5D=722&term%5B7%5D%5B%5D=15&term%5B7%5D%5B%5D=12&term%5B7%5D%5B%5D=1175"
-        elif moviequality in ['1080p']:
-            qualpar="&term%5B17%5D%5B%5D=541&term%5B17%5D%5B%5D=542&term%5B17%5D%5B%5D=719&term%5B17%5D%5B%5D=1160&term%5B17%5D%5B%5D=722&term%5B7%5D%5B%5D=16&term%5B7%5D%5B%5D=1162&term%5B7%5D%5B%5D=1174"
-        elif moviequality in ['dvd-r','dvdr']:
-            qualpar="&term%5B17%5D%5B%5D=541&term%5B17%5D%5B%5D=542&term%5B17%5D%5B%5D=719&term%5B17%5D%5B%5D=1160&term%5B17%5D%5B%5D=722&term%5B7%5D%5B%5D=13&term%5B7%5D%5B%5D=14"
-        elif moviequality in ['br-disk']:
-            qualpar="&term%5B17%5D%5B%5D=541&term%5B17%5D%5B%5D=542&term%5B17%5D%5B%5D=719&term%5B17%5D%5B%5D=1160&term%5B17%5D%5B%5D=722&term%5B7%5D%5B%5D=1171&term%5B7%5D%5B%5D=17"
-        else:
-            qualpar="&term%5B17%5D%5B%5D=541&term%5B17%5D%5B%5D=542&term%5B17%5D%5B%5D=719&term%5B17%5D%5B%5D=1160&term%5B17%5D%5B%5D=722&term%5B7%5D%5B%5D=8&term%5B7%5D%5B%5D=9&term%5B7%5D%5B%5D=10&term%5B7%5D%5B%5D=11&term%5B7%5D%5B%5D=18&term%5B7%5D%5B%5D=19"
-        if quality['custom']['3d']==1:
-            qualpar=qualpar+"&term%5B9%5D%5B%5D=24&term%5B9%5D%5B%5D=23"
+            request = title.replace(':', '')
+        request = urllib2.quote(request.encode('iso-8859-1'))
 
-        for MovieTitle in MovieTitles:
+        log.debug('Looking on T411 for movie named %s or %s' % (title, newTitle))
+        url = self.urls['search'] % (request, acceptableQualityTerms(quality))
+        data = self.getHTMLData(url)
+
+        log.debug('Received data from T411')
+        if data:
+            log.debug('Data is valid from T411')
+            html = BeautifulSoup(data)
+
             try:
-                TitleStringReal = str(MovieTitle.encode("latin-1").replace('-',' '))
+                result_table = html.find('table', attrs = {'class':'results'})
+                if not result_table:
+                    log.debug('No table results from T411')
+                    return
+
+                torrents = result_table.find('tbody').findAll('tr')
+                for result in torrents:
+                    idt = result.findAll('td')[2].findAll('a')[0]['href'][1:].replace('torrents/nfo/?id=','')
+                    release_name = result.findAll('td')[1].findAll('a')[0]['title']
+                    words = title.lower().replace(':',' ').split()
+                    if self.conf('ignore_year'):
+                        index = release_name.lower().find(words[-1] if words[-1] != 'the' else words[-2]) + len(words[-1] if words[-1] != 'the' else words[-2]) +1
+                        index2 = index + 7
+                        if not str(movie['info']['year']) in release_name[index:index2]:
+                            release_name = release_name[0:index] + '(' + str(movie['info']['year']) + ').' + release_name[index:]
+                    #if 'the' not in release_name.lower() and (words[-1] == 'the' or words[0] == 'the'):
+                    #    release_name = 'the.' + release_name
+                    if 'multi' in release_name.lower():
+                        release_name = release_name.lower().replace('truefrench','').replace('french','')
+                    age = result.findAll('td')[4].text
+                    log.debug('result : name=%s, detail_url=%s' % (replaceTitle(release_name, title, newTitle), (self.urls['detail'] % idt)))
+                    results.append({
+                        'id': idt,
+                        'name': replaceTitle(release_name, title, newTitle),
+                        'url': self.urls['download'] % idt,
+                        'detail_url': self.urls['detail'] % idt,
+                        'age' : age,
+                        'size': self.parseSize(str(result.findAll('td')[5].text)),
+                        'seeders': result.findAll('td')[7].text,
+                        'leechers': result.findAll('td')[8].text,
+                    })
+
             except:
-                continue
-            try:
-                results.append(urllib.urlencode( {'search': TitleStringReal, 'cat' : 210, 'submit' : 'Recherche', 'subcat': subcat } ) + qualpar)
-                results.append(urllib.urlencode( {'search': simplifyString(unicode(TitleStringReal,"latin-1")), 'cat' : 210, 'submit' : 'Recherche', 'subcat': subcat } ) + qualpar)
-            except:
-                continue
-
-        return results
-
-    def _search(self, movie, quality, results):
-
-        # Cookie login
-        if not self.last_login_check and not self.login():
-            return
-        searchStrings= self.getSearchParams(movie,quality)
-        lastsearch=0
-        for searchString in searchStrings:
-            actualtime=int(time.time())
-            if actualtime-lastsearch<10:
-                timetosleep= 10-(actualtime-lastsearch)
-                time.sleep(timetosleep)
-            URL = self.urls['search']+searchString
-
-            r = self.opener.open(URL)
-            soup = BeautifulSoup( r, "html.parser" )
-            if soup.find('table', attrs = {'class':'results'}):
-                resultdiv = soup.find('table', attrs = {'class':'results'}).find('tbody')
-            else:
-                continue
-            if resultdiv:
-                try:
-                    for result in resultdiv.findAll('tr'):
-                        try:
-                            categorie = result.findAll('td')[0].findAll('a')[0]['href'][result.findAll('td')[0].findAll('a')[0]['href'].find('='):]
-                            insert = 0
-
-                            if categorie == '=631':
-                                insert = 1
-                            if categorie == '=455':
-                                insert = 1
-                            if categorie == '=634':
-                                insert = 1
-
-                            if insert == 1 :
-
-                                new = {}
-
-                                idt = result.findAll('td')[2].findAll('a')[0]['href'][1:].replace('torrents/nfo/?id=','')
-                                name = result.findAll('td')[1].findAll('a')[0]['title']
-                                testname=namer_check.correctName(name,movie)
-                                if testname==0:
-                                    continue
-                                url = ('http://www.t411.al/torrents/download/?id=%s' % idt)
-                                detail_url = ('http://www.t411.al/torrents/?id=%s' % idt)
-                                leecher = result.findAll('td')[8].text
-                                size = result.findAll('td')[5].text
-                                age = result.findAll('td')[4].text
-                                seeder = result.findAll('td')[7].text
-
-                                def extra_check(item):
-                                    return True
-
-                                new['id'] = idt
-                                new['name'] = name + ' french'
-                                new['url'] = url
-                                new['detail_url'] = detail_url
-                                new['size'] = self.parseSize(str(size))
-                                new['age'] = self.ageToDays(str(age))
-                                new['seeders'] = tryInt(seeder)
-                                new['leechers'] = tryInt(leecher)
-                                new['extra_check'] = extra_check
-                                new['download'] = self.download
-
-                                results.append(new)
-
-                        except:
-                            log.error('Failed parsing T411: %s', traceback.format_exc())
-
-                except AttributeError:
-                    log.debug('No search results found.')
-            else:
-                log.debug('No search results found.')
-
-    def ageToDays(self, age_str):
-        age = 0
-        age_str = age_str.replace('&nbsp;', ' ')
-        regex = '(\d*.?\d+).(sec|heure|heures|jour|jours|semaine|semaines|mois|ans|an)+'
-        matches = re.findall(regex, age_str)
-        for match in matches:
-            nr, size = match
-            mult = 0
-            if size in ('jour','jours'):
-                mult = 1
-            if size in ('semaine','semaines'):
-                mult = 7
-            elif size == 'mois':
-                mult = 30
-            elif size in ('ans','an'):
-                mult = 365
-
-            age += tryInt(nr) * mult
-
-        return tryInt(age)
-
-    def login(self):
-
-        self.opener.addheaders = [
-            ('User-Agent', 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.1 (KHTML, like Gecko)'),
-            ('Accept', 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'),
-            ('Accept-Language', 'fr-fr,fr;q=0.5'),
-            ('Accept-Charset', 'ISO-8859-1,utf-8;q=0.7,*;q=0.7'),
-            ('Keep-Alive', '115'),
-            ('Connection', 'keep-alive'),
-            ('Cache-Control', 'max-age=0'),
-        ]
-
-        try:
-            response = self.opener.open('http://www.t411.al/users/login/', self.getLoginParams())
-        except urllib2.URLError as e:
-            log.error('Login to T411 failed: %s' % e)
-            return False
-
-        if response.getcode() == 200:
-            log.debug('Login HTTP T411 status 200; seems successful')
-            self.last_login_check = self.opener
-            return True
-        else:
-            log.error('Login to T411 failed: returned code %d' % response.getcode())
-            return False
+                log.error('Failed to parse T411: %s' % (traceback.format_exc()))
 
     def getLoginParams(self):
-        return tryUrlencode({
+        log.debug('Getting login params for T411')
+        return {
              'login': self.conf('username'),
              'password': self.conf('password'),
              'remember': '1',
              'url': '/'
-        })
+        }
 
+    def loginSuccess(self, output):
+        log.debug('Checking login success for T411: %s' % ('True' if ('logout' in output.lower()) else 'False'))
 
-    def download(self, url = '', nzb_id = ''):
-        if not self.last_login_check and not self.login():
-            return
+        if 'confirmer le captcha' in output.lower():
+            log.debug('Too many login attempts. A captcha is displayed.')
+            output = self._solveCaptcha(output)
+
+        return 'logout' in output.lower()
+
+    def _solveCaptcha(self, output):
+        """
+        When trying to connect too many times with wrong password, a captcha can be requested.
+        This captcha is really simple and can be solved by the provider.
+        <label for="pass">204 + 65 = </label>
+            <input type="text" size="40" name="captchaAnswer" id="lgn" value=""/>
+            <input type="hidden" name="captchaQuery" value="204 + 65 = ">
+            <input type="hidden" name="captchaToken" value="005d54a7428aaf587460207408e92145">
+        <br/>
+        :param output: initial login output
+        :return: output after captcha resolution
+        """
+        html = BeautifulSoup(output)
+
+        query = html.find('input', {'name': 'captchaQuery'})
+        token = html.find('input', {'name': 'captchaToken'})
+        if not query or not token:
+            log.error('Unable to solve login captcha.')
+            return output
+
+        query_expr = query.attrs['value'].strip('= ')
+        log.debug(u'Captcha query: ' + query_expr)
+        answer = _arithmeticEval(query_expr)
+
+        log.debug(u'Captcha answer: %s' % answer)
+
+        login_params = self.getLoginParams()
+
+        login_params['captchaAnswer'] = answer
+        login_params['captchaQuery'] = query.attrs['value']
+        login_params['captchaToken'] = token.attrs['value']
+
+        return self.urlopen(self.urls['login'], data = login_params)
+
+    loginCheckSuccess = loginSuccess
+
+    def getFrenchTitle(self, title, year):
+        """
+        This function uses TMDB API to get the French movie title of the given title.
+        """
+
+        url = "https://api.themoviedb.org/3/search/movie?api_key=0f3094295d96461eb7a672626c54574d&language=fr&query=%s" % title
+        log.debug('Looking on TMDB for French title of : ' + title)
+        #data = self.getJsonData(url, decode_from = 'utf8')
+        data = self.getJsonData(url)
         try:
-            request = urllib2.Request(url)
-
-            response = self.last_login_check.open(request)
-            # unzip if needed
-            if response.info().get('Content-Encoding') == 'gzip':
-                buf = StringIO(response.read())
-                f = gzip.GzipFile(fileobj = buf)
-                data = f.read()
-                f.close()
+            if data['results'] != None:
+                for res in data['results']:
+                    yearI = res['release_date']
+                    if year in yearI:
+                        break
+                frTitle = res['title'].lower()
+                if frTitle == title:
+                    log.debug('TMDB report identical FR and original title')
+                    return None
+                else:
+                    log.debug(u'L\'API TMDB a trouve un titre francais => ' + frTitle)
+                    return frTitle
             else:
-                data = response.read()
-            response.close()
-            return data
+                log.debug('TMDB could not find a movie corresponding to : ' + title)
+                return None
         except:
-            return 'try_next'
+            log.error('Failed to parse TMDB API: %s' % (traceback.format_exc()))
+
+def acceptableQualityTerms(quality):
+    """
+    This function retrieve all the acceptable terms for a quality (eg hdrip and bdrip for brrip)
+    Then it creates regex accepted by t411 to search for one of this term
+    t411 have to handle alternatives as OR and then the regex is firstAlternative|secondAlternative
+    In alternatives, there can be "doubled terms" as "br rip" or "bd rip" for brrip
+    These doubled terms have to be handled as AND and are then (firstBit&secondBit)
+    """
+    alternatives = quality.get('alternative', [])
+    # first acceptable term is the identifier itself
+    acceptableTerms = [quality['identifier']]
+    log.debug('Requesting alternative quality terms for : ' + str(acceptableTerms) )
+    # handle single terms
+    acceptableTerms.extend([ term for term in alternatives if type(term) == type('') ])
+    # handle doubled terms (such as 'dvd rip')
+    doubledTerms = [ term for term in alternatives if type(term) == type(('', '')) ]
+    acceptableTerms.extend([ '('+first+'%26'+second+')' for (first,second) in doubledTerms ])
+    # join everything and return
+    log.debug('Found alternative quality terms : ' + str(acceptableTerms).replace('%26', ' '))
+    return '|'.join(acceptableTerms)
+
+def replaceTitle(releaseNameI, titleI, newTitleI):
+    """
+    This function is replacing the title in the release name by the old one,
+    so that couchpotato recognise it as a valid release.
+    """
+
+    if newTitleI is None: # if the newTitle is empty, do nothing
+        return releaseNameI
+    else:
+        # input as lower case
+        releaseName = releaseNameI.lower()
+        title = titleI.lower()
+        newTitle = newTitleI.lower()
+        log.debug('Replacing -- ' + newTitle + ' -- in the release -- ' + releaseName + ' -- by the original title -- ' + title)
+        separatedWords = []
+        for s in releaseName.split(' '):
+            separatedWords.extend(s.split('.'))
+        # test how far the release name corresponds to the original title
+        index = 0
+        while separatedWords[index] in title.split(' '):
+            index += 1
+        # test how far the release name corresponds to the new title
+        newIndex = 0
+        while separatedWords[newIndex] in newTitle.split(' '):
+            newIndex += 1
+        # then determine if it correspoinds to the new title or old title
+        if index >= newIndex:
+            # the release name corresponds to the original title. SO no change needed
+            log.debug('The release name is already corresponding. Changed nothing.')
+            return releaseNameI
+        else:
+            # otherwise, we replace the french title by the original title
+            finalName = [title]
+            finalName.extend(separatedWords[newIndex:])
+            newReleaseName = ' '.join(finalName)
+            log.debug('The new release name is : ' + newReleaseName)
+            return newReleaseName
 
 config = [{
     'name': 't411',
@@ -235,7 +269,8 @@ config = [{
             'list': 'torrent_providers',
             'name': 't411',
             'description': 'See <a href="https://www.t411.al/">T411</a>',
-            'icon' : 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAIGNIUk0AAHolAACAgwAA+f8AAIDpAAB1MAAA6mAAADqYAAAXb5JfxUYAAAILSURBVHja5NNdS1MBAMbxfztnbtNlZRnq1DYOZiUWEZkLKgoyA5WibGAWEhgFQhfhboKgmy4kBIteLhODVhYxCEFDMssLdZrD95cc0+lSp9tp6nC6nS4E/QDeBD0f4AfPA4+oKApbicgW848AZz57qZR2MK2OlcbkSPFUW+Mtl8OhXVGpPPFJhl/x6dLo90l/n3+PcYIDR2YZ7J9gvA/lhWUdCItaXc1AoKbFNVK+5vfB80cgd6DLLkiLiBpzeGKSzHOnCP/8wtKHAJrUTNfKbqkCaBABuobnqi8lr5VLTjvDkzLIM6TmFNHRbudV/Q9sNjuvnz3kbnEZubmHCSzMmmxN3U+gZB0wDjVfqbt2EUuDzPC8jG7/IQpKrvPy7Vd0Wg3enm5q3zWyGruL31Et6aYMqG9L2NggPNZJXUsS9jcfIfsCeaU3KLMUYf/mQNqXRtDVS3TpD1q9nmnvFOaskyDqNkd0j7g/tQ54bp8+m0urN0TvwhrvbXaMGSZEQWBbTCIJcRq263UEg0uEQyFiDCbfBpBkfXo/MNu+cybEZZL3qsfnlqmuuoOQks3RnOMoKWnUNnURVlREI2q51un3iMdOPNgAtNLBxYqbWRZnfqGhqrnnnm9++Sqlj+MiiuBxrOKmpHDUGwwNIgj9oqAa8i8uBwl5Nyu48lUA5JkTpyrN562A9T/6wt8BAMiyz2KTkBbfAAAAAElFTkSuQmCC', 'wizard': True,
+            'icon' : 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAA3NCSVQICAjb4U/gAAACdklEQVQokW2RX0hTcRTHz+/+cbvz3m1srbv8M6Ws6SbK1hRTkUoKIui5jIJ8sz9vQQTRQxDRexCkIGgmSC+B1YNWNCIrRQ3Z2PyTf5pb2/S2ud2/2723hyIt/b4cDud7+H4OB2CXrpOW+wYLYPju0R66DTABEAWYB7i6lwHtbEYAKi5crPE36Wa6QGKQyYylk1cePPwX4FqPquSSiZVHAN+Gh/JihpezUpGXinmxkBN5Lvjm5U4/1hzwS5JsJIkzkWnmZDtSZF2WQZZ0SSoIgiSJXq+37VjLNhLL7h/ofUzg0Dceutl1ejHOoa0fScUQW1rouXQWw3ANULXbt8cNJ7pudPrcd/pmLp8PBNpa344HDYTqYc2Ls58G+59sI/0uTgBTKj78OQIdTb6W5gKg+PpKaPprUoLB/mBHY/v/CacARru7ucaG6NCrj5vp2rpDWvmBDa83PzDwdJVOl5Zo8S+JQhoD7E/CGMBEKLyYTNWjLKNl6KkP5OsXbE1leGqdNFoBd3K034jbcJzYfqfPTpUZjOHkmkmS+SpzinXYlxdGM+4I5ezkoyHSUcIjHXHY3wWPqM9SOg2ataFMlvQ6YWs5FIvaKxxgmzEfrWYOazanXuAxAGBwGALoNcWePxtx8cKR4wGuBFZo05TI2gXViE3SaiyVn3bQRgU0DABuVdHn7na6iuSMAOk2X6WnrqLcMVlqTVQ5lHw2VaQURtNN+7YoD7L4cQCQKGo9GJsUEGC6bNPfzc1xpZAjWuH7+3u+xHy+BuFLLkYsx7la0yrCAeqdZg0h1kDQFkpVlSyvrG1krM5mNbtK/9wM0wddjF6UNywElpWVX6HUDxDMdBkmAAAAAElFTkSuQmCC',
+            'wizard': True,
             'options': [
                 {
                     'name': 'enabled',
