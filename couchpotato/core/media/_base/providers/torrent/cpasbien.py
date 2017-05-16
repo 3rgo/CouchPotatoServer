@@ -95,11 +95,11 @@ class Base(TorrentProvider):
                         nothing = firstTd.findAll("center")
                         if nothing:
                             continue
-                        name = firstTd.findAll("a")[1]['title'];
+                        name = firstTd.findAll("a")[0]['title'];
                         testname = namer_check.correctName(name,movie)
                         if testname == 0 and nbrResult < 5:
                             values_sec = {}
-                            url_sec = result.findAll("a")[1]['href'];
+                            url_sec = result.findAll("a")[0]['href'];
                             req_sec = urllib2.Request(URLTST+url_sec, values_sec, headers={'User-Agent': "Mozilla/5.0"})
                             data_sec = urllib2.urlopen(req_sec)
                             if data_sec:
@@ -113,7 +113,7 @@ class Base(TorrentProvider):
                             continue
                         nbrResult += 1
                         values_sec = {}
-                        detail_url = result.findAll("a")[1]['href'];
+                        detail_url = result.findAll("a")[0]['href'];
                         req_sec = urllib2.Request(URLTST+detail_url, values_sec, headers={'User-Agent': "Mozilla/5.0"})
                         data_sec = urllib2.urlopen(req_sec)
                         html_sec = BeautifulSoup(data_sec)
