@@ -29,13 +29,10 @@ class OMDBAPI(MovieProvider):
         addEvent('movie.search', self.search)
         addEvent('movie.info', self.getInfo)
 
-<<<<<<< HEAD
-    def search(self, q, limit = 5):
-=======
+
     def search(self, q, limit = 12):
         if self.isDisabled():
             return []
->>>>>>> 0a97ed5a2312083465939e24cf0a5fd7a2f2ca35
 
         name_year = fireEvent('scanner.name_year', q, single = True)
 
