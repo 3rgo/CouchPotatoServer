@@ -10,3 +10,9 @@
 .coverage
 coverage.xml
 nosetests.xml
+
+# Visual Studio
+
+/.vs
+couchpotato/core/media/_base/providers/torrent/kickasstorrents.py
+couchpotato/core/media/movie/providers/info/omdbapi.py

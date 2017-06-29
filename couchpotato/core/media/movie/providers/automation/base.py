@@ -1,4 +1,5 @@
 import time
+import unicodedata
 
 from couchpotato.core.event import addEvent, fireEvent
 from couchpotato.core.logger import CPLog
@@ -45,7 +46,12 @@ class Automation(AutomationBase):
 
     def search(self, name, year = None, imdb_only = False):
 
-        prop_name = 'automation.cached.%s.%s' % (name, year)
+        try:
+            cache_name = name.decode('utf-8').encode('ascii', 'ignore')
+        except UnicodeEncodeError:
+            cache_name = unicodedata.normalize('NFKD', name).encode('ascii','ignore')
+
+        prop_name = 'automation.cached.%s.%s' % (cache_name, year)
         cached_imdb = Env.prop(prop_name, default = False)
         if cached_imdb and imdb_only:
             return cached_imdb
