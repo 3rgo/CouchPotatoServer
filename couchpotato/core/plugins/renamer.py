@@ -216,9 +216,6 @@ class Renamer(Plugin):
                 except:
                     log.error('Failed getting files from %s: %s', (media_folder, traceback.format_exc()))
 
-                # post_filter files from configuration; this is a ":"-separated list of globs
-                files = self.filesAfterIgnoring(files)
-
         db = get_db()
 
         # Extend the download info with info stored in the downloaded release
@@ -290,6 +287,12 @@ class Renamer(Plugin):
 
                 media = group['media']
                 media_title = getTitle(media)
+                fr_media_title = media_title
+
+                res = fireEvent('movie.getfrenchtitle', movie = media)
+
+                if res != None and len(res) > 0:
+                    fr_media_title = res[0]
 
                 # Overwrite destination when set in category
                 destination = to_folder
@@ -319,6 +322,7 @@ class Renamer(Plugin):
 
                 # Remove weird chars from movie name
                 movie_name = re.sub(r"[\x00\/\\:\*\?\"<>\|]", '', media_title)
+                fr_movie_name = re.sub(r"[\x00\/\\:\*\?\"<>\|]", '', fr_media_title)
 
                 # Put 'The' at the end
                 name_the = movie_name
@@ -327,10 +331,18 @@ class Renamer(Plugin):
                         name_the = movie_name[len(prefix):] + ', ' + prefix.strip().capitalize()
                         break
 
+                fr_name_the = fr_movie_name
+                for prefix in ['le ', 'la ']:
+                    if prefix == fr_movie_name[:len(prefix)].lower():
+                        name_the = fr_movie_name[len(prefix):] + ', ' + prefix.strip().capitalize()
+                        break
+
                 replacements = {
                     'ext': 'mkv',
                     'namethe': name_the.strip(),
                     'thename': movie_name.strip(),
+                    'frnamethe': fr_name_the.strip(),
+                    'frthename': fr_movie_name.strip(),
                     'year': media['info']['year'],
                     'first': name_the[0].upper(),
                     'quality': group['meta_data']['quality']['label'],
@@ -350,21 +362,10 @@ class Renamer(Plugin):
                     'category': category_label,
                     '3d': '3D' if group['meta_data']['quality'].get('is_3d', 0) else '',
                     '3d_type': group['meta_data'].get('3d_type'),
-                    '3d_type_short': group['meta_data'].get('3d_type'),
                 }
 
                 if replacements['mpaa_only'] not in ('G', 'PG', 'PG-13', 'R', 'NC-17'):
                     replacements['mpaa_only'] = 'Not Rated'
-
-                if replacements['3d_type_short']:
-                    replacements['3d_type_short'] = replacements['3d_type_short'].replace('Half ', 'H').replace('Full ', '')
-                if self.conf('use_tab_threed') and replacements['3d_type']:
-                    if 'OU' in replacements['3d_type']:
-                        replacements['3d_type'] = replacements['3d_type'].replace('OU','TAB')
-                if self.conf('use_tab_threed') and replacements['3d_type_short']:
-                    if 'OU' in replacements['3d_type_short']:
-                        replacements['3d_type_short'] = replacements['3d_type_short'].replace('OU','TAB')
-                    
 
                 for file_type in group['files']:
 
@@ -1179,30 +1180,6 @@ Remove it if you want it to be renamed (again, or at least let it try again)
     def movieInFromFolder(self, media_folder):
         return media_folder and isSubFolder(media_folder, sp(self.conf('from'))) or not media_folder
 
-    @property
-    def ignored_in_path(self):
-        return self.conf('ignored_in_path').split(":") if self.conf('ignored_in_path') else []
-
-    def filesAfterIgnoring(self, original_file_list):
-        kept_files = []
-        for path in original_file_list:
-            if self.keepFile(path):
-                kept_files.append(path)
-            else:
-                log.debug('Ignored "%s" during renaming', path)
-        return kept_files
-
-    def keepFile(self, filename):
-
-        # ignoredpaths
-        for i in self.ignored_in_path:
-            if i in filename.lower():
-                log.debug('Ignored "%s" contains "%s".', (filename, i))
-                return False
-
-        # All is OK
-        return True
-
     def extractFiles(self, folder = None, media_folder = None, files = None, cleanup = False):
         if not files: files = []
 
@@ -1330,13 +1307,14 @@ rename_options = {
         'ext': 'Extension (mkv)',
         'namethe': 'Moviename, The',
         'thename': 'The Moviename',
+        'frnamethe': 'NomDuFilm, Le',
+        'frthename': 'Le NomDuFilm',
         'year': 'Year (2011)',
         'first': 'First letter (M)',
         'quality': 'Quality (720p)',
         'quality_type': '(HD) or (SD)',
         '3d': '3D',
         '3d_type': '3D Type (Full SBS)',
-        '3d_type_short' : 'Short 3D Type (FSBS)',
         'video': 'Video (x264)',
         'audio': 'Audio (DTS)',
         'group': 'Releasegroup name',
@@ -1399,25 +1377,11 @@ config = [{
                 },
                 {
                     'advanced': True,
-                    'name': 'use_tab_threed',
-                    'type': 'bool',
-                    'label': 'Use TAB 3D',
-                    'description': ('Use TAB (Top And Bottom) instead of OU (Over Under).','This will allow Kodi to recognize vertical formatted 3D movies properly.'),
-                    'default': True
-                },
-                {
-                    'advanced': True,
                     'name': 'replace_doubles',
                     'type': 'bool',
                     'label': 'Clean Name',
                     'description': ('Attempt to clean up double separaters due to missing data for fields.','Sometimes this eliminates wanted white space (see <a href="https://github.com/CouchPotato/CouchPotatoServer/issues/2782" target="_blank">#2782</a>).'),
                     'default': True
-                },
-                {
-                    'name': 'ignored_in_path',
-                    'label': 'Ignored file patterns',
-                    'description': ('A list of globs to path match when scanning, separated by ":"', 'anything on this list will be skipped during rename operations'),
-                    'default': '*/.sync/*',
                 },
                 {
                     'name': 'unrar',
