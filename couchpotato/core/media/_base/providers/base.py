@@ -226,8 +226,10 @@ class YarrProvider(Provider):
 
         # Do search based on imdb id
         if imdb_results:
-            self._search(media, quality, results, False)
-            self._search(media, quality, results, True)
+            media['originalName'] = False
+            self._search(media, quality, results)
+            media['originalName'] = True
+            self._search(media, quality, results)
        # Search possible titles
         else:
             media_title = fireEvent('library.query', media, include_year = False, single = True)

@@ -24,11 +24,11 @@ class Base(TorrentProvider):
         'search': 'http://www.torrent9.top/search_torrent/',
     }
 
-    def _search(self, movie, quality, results, original = False):
+    def _search(self, movie, quality, results):
         #for title in movie['info']['titles']:
         #    try:
-                info =  movie['info']
-                if(original == True):
+                info = movie['info']
+                if(movie['originalName'] == True):
                             info = movie
                 TitleStringReal = (getTitle(info) + ' ' + simplifyString(quality['identifier'] )).replace('-',' ').replace(' ',' ').replace(' ',' ').replace(' ',' ').encode("utf-8")
 

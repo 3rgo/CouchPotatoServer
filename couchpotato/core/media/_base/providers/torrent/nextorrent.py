@@ -40,14 +40,14 @@ class Base(TorrentProvider):
             else:
                 raise Base.NotLoggedInHTTPError(req.get_full_url(), code, msg, headers, fp)
 
-    def _search(self, movie, quality, results, original):
+    def _search(self, movie, quality, results):
 
                 # Cookie login
         if not self.last_login_check and not self.login():
             return
 
-        info =  movie['info']
-        if(original == True):
+        info = movie['info']
+        if (movie['originalName'] == True):
                     info = movie
         TitleStringReal = (getTitle(info) + ' ' + simplifyString(quality['identifier'] )).replace('-',' ').replace(' ',' ').replace(' ',' ').replace(' ',' ').encode("utf8")
 
