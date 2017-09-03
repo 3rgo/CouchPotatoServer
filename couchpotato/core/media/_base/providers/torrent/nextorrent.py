@@ -40,14 +40,16 @@ class Base(TorrentProvider):
             else:
                 raise Base.NotLoggedInHTTPError(req.get_full_url(), code, msg, headers, fp)
 
-    def _search(self, movie, quality, results):
+    def _search(self, movie, quality, results, original):
 
                 # Cookie login
         if not self.last_login_check and not self.login():
             return
 
-
-        TitleStringReal = (getTitle(movie['info']) + ' ' + simplifyString(quality['identifier'] )).replace('-',' ').replace(' ',' ').replace(' ',' ').replace(' ',' ').encode("utf8")
+        info =  movie['info']
+        if(original == True):
+                    info = movie
+        TitleStringReal = (getTitle(info) + ' ' + simplifyString(quality['identifier'] )).replace('-',' ').replace(' ',' ').replace(' ',' ').replace(' ',' ').encode("utf8")
 
         URL = (self.urls['search']).encode('UTF8')
         URL=unicodedata.normalize('NFD',unicode(URL,"utf8","replace"))
@@ -60,7 +62,7 @@ class Base(TorrentProvider):
         URLTST = (self.urls['test']).encode('UTF8')
 
         data_tmp = urllib.urlencode(values)
-
+        log.info('opening url %s', URL)
 
         req = urllib2.Request(URL, data_tmp, headers={'User-Agent' : "Mozilla/5.0"} )
 
@@ -98,6 +100,7 @@ class Base(TorrentProvider):
                         name = firstTd.findAll("a")[0]['title'];
                         testname = namer_check.correctName(name,movie)
                         if testname == 0 and nbrResult < 5:
+                            log.info('found title %s', testname)
                             values_sec = {}
                             url_sec = result.findAll("a")[0]['href'];
                             req_sec = urllib2.Request(URLTST+url_sec, values_sec, headers={'User-Agent': "Mozilla/5.0"})
