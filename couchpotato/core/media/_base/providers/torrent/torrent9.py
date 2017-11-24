@@ -20,8 +20,8 @@ log = CPLog(__name__)
 
 class Base(TorrentProvider):
     urls = {
-        'site': 'http://www.torrent9.top/',
-        'search': 'http://www.torrent9.top/search_torrent/',
+        'site': 'http://www.torrent9.pe/',
+        'search': 'http://www.torrent9.pe/search_torrent/',
     }
 
     def _search(self, movie, quality, results):
@@ -118,7 +118,7 @@ config = [{
             'tab': 'searcher',
             'list': 'torrent_providers',
             'name': 'torrent9',
-            'description': 'See <a href="http://www.torrent9.top/">Torrent9</a>',
+            'description': 'See <a href="http://www.torrent9.pe/">Torrent9</a>',
             'icon': 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAACXBIWXMAAA7DAAAOwwHHb6hkAAAAIGNIUk0AAHolAACAgwAA+f8AAIDpAAB1MAAA6mAAADqYAAAXb5JfxUYAAAKCSURBVHjafNPdS1NhAMfxg1hiUoYpIhqaL53Nuuiim+iim6CL/AMieqV0qelSp25HhTRcmduc73M7EyUtUwILyxSRDMM0jOwi7cJKzElZrs6oMN2+XRgsQvfA9/bD88DzE0RJdiXobMqeQpsSX9DsT9esJBXalKRiu6IqcSqiJG+US1BLMqPTH5hfcjM9/4mX7xZ49d7F7OIXFpbc5N8eIizLiijJGyaoJVlZ9vxgs2PsGyM43bQZoAiiJCsHrrYRkVvP9b4xAFxuDwfL2xElmX1lraQYHIGB2IJmhFNGDD1PAJj/+p3YvCZ2ZFlJ1jtI0tsJy7QSnG5m5+U6UgwO1CVOPyBKMlszzJT3jgKwsKyglmTiC21E5zUSrW2g7N4IXeNvONPygPBsK4l6O6oSZ2Bg15VG4vIaGZmew7e6ytu5RQBMD8cI0VjY+/8NKu4/A2Dxmwe1JCOcq8L06DkAR4ydCCcqMPdPAHC06g5R2kY/EHShGnP/OAC+tbV14GQlfVOzrK78Rjh7A+H8TUI1FsBH7eMJQjQWPxCT30SatYf6wRcU3R1GJcmEaCxobw0CcK13lGS9HW3HIPi8WAcm2JJh9gP7y1qJyW8i6KKJbZk1iJJMssFBZG49tqHJ9ae5Pcx8/IzX68XQPUzopRo/sFGppU4SiloITjehLm0lPKeO7PYBAI5beojUNgQGUgwOVJLMseouREkmzdLN2uoaA69nCdXUkKJ3BAYSi+1E5dTRNznDz18r4PPS9nSK7dlW4gqaUf/9BwQqsdjOocoOTtsecNjYSXh2LXE6G6mlzvUxiZLs2mSqiijJirrEqezW2ZSI3HolJr9JSTY4/p23688AdGGN9hQwll4AAAAASUVORK5CYII=',
             'wizard': True,
             'options': [
